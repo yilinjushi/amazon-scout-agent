@@ -89,6 +89,19 @@ ${JSON.stringify(COMPANY_PROFILE.techStack)}
 Translate all product names, descriptions, reasonings, and tech stacks into Chinese.
 `;
 
+// Helper: Ensure URL is safe (not a hallucinated ASIN)
+const ensureSafeUrl = (product: ScoutedProduct): string => {
+    const url = product.url || '';
+    const name = product.name || '';
+    
+    // If URL looks like a direct specific product page (which AI often hallucinates), 
+    // force it to be a Search URL instead.
+    if (!url || url.includes('/dp/') || url.includes('/gp/') || !url.startsWith('http')) {
+        return `https://www.amazon.com/s?k=${encodeURIComponent(name)}`;
+    }
+    return url;
+};
+
 // Modified signature to accept apiKey directly
 export const scoutAmazonProducts = async (apiKey: string): Promise<AgentReport> => {
   if (!apiKey) {
@@ -155,7 +168,7 @@ export const scoutAmazonProducts = async (apiKey: string): Promise<AgentReport> 
           "matchScore": 85,
           "reasoning": "推荐理由（中文）...",
           "requiredTech": ["技术1（中文）", "技术2"],
-          "url": "https://...",
+          "url": "Provide an Amazon Search URL (e.g. https://www.amazon.com/s?k=Keywords) to ensure the link works. DO NOT guess /dp/ ASIN links.",
           "imageUrl": "https://... (image url if found)",
           "isNewRelease": true
         }
@@ -186,18 +199,20 @@ export const scoutAmazonProducts = async (apiKey: string): Promise<AgentReport> 
     
     let rawProducts = data.products || [];
     
-    // --- 2. CODE-LEVEL ROBUST DEDUPLICATION ---
-    // Use fuzzy matching against the ENTIRE history (not just the recent slice sent to AI)
-    // This catches slight variations like "Smart Watch" vs "Smart Watch Black"
+    // --- 2. CODE-LEVEL ROBUST DEDUPLICATION & SANITIZATION ---
+    // Use fuzzy matching against the ENTIRE history
     
     const uniqueProducts = rawProducts.filter((p: ScoutedProduct) => {
-        // We use a threshold of 0.75 (75% similarity) to be relatively strict but allow distinct variations
         const isDuplicate = isFuzzyDuplicate(p.name, history, 0.75);
         if (isDuplicate) {
             console.log(`Filtered fuzzy duplicate: ${p.name}`);
         }
         return !isDuplicate;
-    });
+    }).map((p: ScoutedProduct) => ({
+        ...p,
+        // Force replace hallucinated ASIN links with Search URLs
+        url: ensureSafeUrl(p)
+    }));
 
     // --- 3. SLICE TO 6 ---
     // We asked for 9, filtered duplicates, now take top 6
@@ -207,8 +222,7 @@ export const scoutAmazonProducts = async (apiKey: string): Promise<AgentReport> 
     if (finalProducts.length > 0) {
         const newNames = finalProducts.map((p: ScoutedProduct) => p.name);
         const updatedHistory = [...history, ...newNames];
-        // Keep unique and slice to prevent infinite growth issues in storage, 
-        // but keep a larger local buffer than what we send to AI
+        // Keep unique and slice to prevent infinite growth issues in storage
         const uniqueHistory = Array.from(new Set(updatedHistory)).slice(-300);
         localStorage.setItem(HISTORY_KEY, JSON.stringify(uniqueHistory));
     }
