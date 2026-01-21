@@ -32,8 +32,6 @@ function App() {
       try {
         const parsed = JSON.parse(savedConfig);
         setConfig(parsed);
-        // Inject into environment for the Gemini Service
-        updateEnvironment(parsed.geminiKey);
       } catch (e) {
         console.error("Failed to parse config", e);
       }
@@ -44,18 +42,9 @@ function App() {
     setIsConfigLoaded(true);
   }, []);
 
-  const updateEnvironment = (key: string) => {
-    if (typeof process !== 'undefined' && process.env) {
-        process.env.API_KEY = key;
-    } else {
-        (window as any).process = { env: { API_KEY: key } };
-    }
-  };
-
   const handleSaveConfig = (newConfig: AppConfig) => {
     setConfig(newConfig);
     localStorage.setItem('agent_config', JSON.stringify(newConfig));
-    updateEnvironment(newConfig.geminiKey);
     setShowConfigModal(false);
   };
 
@@ -69,10 +58,9 @@ function App() {
     setReport(null);
     try {
       // 1. Scout Products (AI Analysis)
-      // Ensure the key is set right before calling
-      updateEnvironment(config.geminiKey);
-      
-      const data = await scoutAmazonProducts();
+      // Pass the key directly from the config state.
+      // We no longer rely on process.env injection which is flaky in browser builds.
+      const data = await scoutAmazonProducts(config.geminiKey);
       setReport(data);
 
       // 2. Auto-send Email
@@ -95,9 +83,9 @@ function App() {
         alert("分析完成。结果已加载。");
       }
 
-    } catch (error) {
-      alert("分析失败。请检查您的网络连接或 API Key 是否有效。");
+    } catch (error: any) {
       console.error(error);
+      alert(`分析失败: ${error.message || "请检查您的网络连接或 API Key 是否有效。"}`);
     } finally {
       setIsAnalyzing(false);
     }
