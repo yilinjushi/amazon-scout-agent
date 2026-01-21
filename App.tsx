@@ -1,0 +1,154 @@
+
+import React, { useState, useEffect } from 'react';
+import { Dashboard } from './components/Dashboard';
+import { ApiKeyModal } from './components/ApiKeyModal';
+import { EmailPreview } from './components/EmailPreview';
+import { scoutAmazonProducts } from './services/geminiService';
+import { sendEmail, formatEmailBody } from './services/emailService';
+import { AgentReport, AppConfig } from './types';
+
+// Default empty config. 
+// SECURITY: Do NOT hardcode keys here anymore. 
+// Users must enter them in the UI, and they will be saved to LocalStorage.
+const EMPTY_CONFIG: AppConfig = {
+  geminiKey: '',
+  emailServiceId: '',
+  emailTemplateId: '',
+  emailPublicKey: ''
+};
+
+function App() {
+  const [config, setConfig] = useState<AppConfig>(EMPTY_CONFIG);
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [report, setReport] = useState<AgentReport | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+
+  // Load config from LocalStorage on startup
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('agent_config');
+    if (savedConfig) {
+      try {
+        const parsed = JSON.parse(savedConfig);
+        setConfig(parsed);
+        // Inject into environment for the Gemini Service
+        updateEnvironment(parsed.geminiKey);
+      } catch (e) {
+        console.error("Failed to parse config", e);
+      }
+    } else {
+        // If no config found, force show the modal
+        setShowConfigModal(true);
+    }
+    setIsConfigLoaded(true);
+  }, []);
+
+  const updateEnvironment = (key: string) => {
+    if (typeof process !== 'undefined' && process.env) {
+        process.env.API_KEY = key;
+    } else {
+        (window as any).process = { env: { API_KEY: key } };
+    }
+  };
+
+  const handleSaveConfig = (newConfig: AppConfig) => {
+    setConfig(newConfig);
+    localStorage.setItem('agent_config', JSON.stringify(newConfig));
+    updateEnvironment(newConfig.geminiKey);
+    setShowConfigModal(false);
+  };
+
+  const handleRunAnalysis = async () => {
+    if (!config.geminiKey) {
+        setShowConfigModal(true);
+        return;
+    }
+
+    setIsAnalyzing(true);
+    setReport(null);
+    try {
+      // 1. Scout Products (AI Analysis)
+      // Ensure the key is set right before calling
+      updateEnvironment(config.geminiKey);
+      
+      const data = await scoutAmazonProducts();
+      setReport(data);
+
+      // 2. Auto-send Email
+      if (config.emailServiceId && config.emailTemplateId && config.emailPublicKey) {
+        try {
+           await sendEmail({
+            serviceId: config.emailServiceId,
+            templateId: config.emailTemplateId,
+            publicKey: config.emailPublicKey,
+            toEmail: "icyfire.info@gmail.com",
+            subject: `Weekly Amazon Product Digest - ${data.date}`,
+            message: formatEmailBody(data)
+          });
+          alert(`分析完成。\n\n结果已加载，报告已自动发送至 icyfire.info@gmail.com`);
+        } catch (emailError) {
+          console.error("Auto-email failed", emailError);
+          alert("分析完成。结果已加载。\n\n警告：自动发送邮件失败。您可以尝试手动发送。");
+        }
+      } else {
+        alert("分析完成。结果已加载。");
+      }
+
+    } catch (error) {
+      alert("分析失败。请检查您的网络连接或 API Key 是否有效。");
+      console.error(error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Don't render until we've checked local storage
+  if (!isConfigLoaded) return null;
+
+  // Check if we have a valid configuration (has Gemini Key)
+  const hasValidConfig = !!config.geminiKey;
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans relative">
+      
+      {/* Header / Config Trigger */}
+      <div className="absolute top-4 right-4 z-10">
+        <button 
+            onClick={() => setShowConfigModal(true)}
+            className="text-xs font-medium text-slate-400 hover:text-slate-600 underline"
+        >
+            {hasValidConfig ? '设置 / 更新 Key' : '未配置'}
+        </button>
+      </div>
+
+      <Dashboard 
+        report={report} 
+        isAnalyzing={isAnalyzing} 
+        onRunAnalysis={handleRunAnalysis}
+        onComposeEmail={() => setShowEmail(true)}
+      />
+
+      {showEmail && report && (
+        <EmailPreview 
+            report={report}
+            config={config}
+            onClose={() => setShowEmail(false)} 
+        />
+      )}
+
+      {/* Force show modal if no config, or if user requested it */}
+      {(showConfigModal || !hasValidConfig) && (
+        <ApiKeyModal 
+            onSave={handleSaveConfig}
+            initialConfig={config}
+            // If we don't have a valid config, user CANNOT close this modal (force setup)
+            canClose={hasValidConfig} 
+            onClose={() => setShowConfigModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+export default App;
