@@ -176,71 +176,41 @@ async function scoutProducts() {
 
 // --- 2. 邮件发送逻辑 (EmailJS) ---
 async function sendEmail(report) {
-  console.log("正在构建邮件内容 (HTML)...");
+  console.log("正在构建邮件内容 (Plain Text)...");
   
-  // 构建 HTML 邮件
-  const emailHtml = `
-<div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 800px;">
-  <p>Hi Team,</p>
-  <p>以下是本周的亚马逊（美国）新产品机会摘要 (服务器自动扫描)，已根据我们的研发能力进行筛选。</p>
+  // 构建纯文本邮件 (与网页版格式保持一致)
+  const emailText = `
+Hi Team,
 
-  <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb; margin: 20px 0;">
-    <h3 style="margin: 0 0 10px 0; color: #1e293b;">执行摘要 (EXECUTIVE SUMMARY)</h3>
-    <p style="margin: 0; font-size: 14px; color: #475569;">${report.summary}</p>
-  </div>
+以下是本周的亚马逊（美国）新产品机会摘要 (服务器自动扫描)，已根据我们的研发能力进行筛选。
 
-  <h3 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: 30px;">
-    已识别的机会 (IDENTIFIED OPPORTUNITIES) - ${report.products.length} 项
-  </h3>
+执行摘要 (EXECUTIVE SUMMARY):
+${report.summary}
 
-  ${report.products.map((p, i) => `
-    <div style="border-bottom: 1px solid #eee; padding: 20px 0;">
-      <h3 style="color: #2563eb; margin: 0 0 10px 0;">#${i + 1}: ${p.name}</h3>
-      
-      ${p.imageUrl ? `
-        <div style="margin: 15px 0;">
-          <img src="${p.imageUrl}" alt="${p.name}" style="max-width: 300px; max-height: 200px; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0;" />
-        </div>
-      ` : ''}
+--------------------------------------------------
+已识别的机会 (IDENTIFIED OPPORTUNITIES) - ${report.products.length} 项
+--------------------------------------------------
 
-      <div style="background-color: #f1f5f9; padding: 10px; border-radius: 6px; font-size: 14px; margin-bottom: 10px;">
-        <strong>匹配度:</strong> ${p.matchScore}/100 
-        <span style="margin: 0 10px;">|</span> 
-        <strong>价格:</strong> ${p.price || 'N/A'} 
-        <span style="margin: 0 10px;">|</span> 
-        <strong>评分:</strong> ${p.amazonRating || 'N/A'}
-      </div>
+${report.products.map((p, i) => `
+#${i + 1}: ${p.name}
+> 匹配度: ${p.matchScore}/100
+> 价格: ${p.price || 'N/A'} | 评分: ${p.amazonRating || 'N/A'}
+> 链接: ${p.url || '未找到链接'}
 
-      <p style="margin: 5px 0;">
-        <strong>链接:</strong> <a href="${p.url || '#'}" style="color: #2563eb; text-decoration: underline;">${p.url || '未找到链接'}</a>
-      </p>
+推荐理由 (WHY IT FITS US):
+${p.reasoning}
 
-      <p style="margin: 10px 0; font-style: italic; color: #555;">
-        <strong>推荐理由:</strong> ${p.reasoning}
-      </p>
+所需技术栈 (REQUIRED TECH STACK):
+[ ${p.requiredTech.join(' ] [ ')} ]
 
-      <p style="margin: 10px 0; font-size: 13px;">
-        <strong>所需技术栈:</strong> 
-        <span style="font-family: monospace; color: #059669; background: #ecfdf5; padding: 2px 6px; border-radius: 4px;">
-          ${p.requiredTech.join(' / ')}
-        </span>
-      </p>
-    </div>
-  `).join('')}
+`).join('\n--------------------------------------------------\n')}
 
-  <div style="margin-top: 30px; font-size: 14px; color: #64748b;">
-    <p><strong>后续行动:</strong></p>
-    <ol style="margin-top: 5px;">
-      <li>查看“匹配度”以评估技术可行性。</li>
-      <li>点击链接分析竞品功能。</li>
-    </ol>
-  </div>
+后续行动:
+1. 查看“匹配度”以评估技术可行性。
+2. 点击链接分析竞品功能。
 
-  <p style="margin-top: 30px; font-size: 14px; color: #94a3b8;">
-    此致,<br/>
-    Amazon Product Scout Agent (Server Bot)
-  </p>
-</div>
+此致,
+Amazon Product Scout Agent (Server Bot)
   `;
 
   const url = 'https://api.emailjs.com/api/v1.0/email/send';
@@ -252,7 +222,7 @@ async function sendEmail(report) {
     template_params: {
       to_email: CONFIG.recipientEmail,
       subject: `[自动周报] 亚马逊产品侦察 - ${report.date}`,
-      message: emailHtml,
+      message: emailText, // 这里发送的是纯文本
     }
   };
 
@@ -292,4 +262,3 @@ async function main() {
 }
 
 main();
-
