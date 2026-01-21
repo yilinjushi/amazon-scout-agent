@@ -89,8 +89,14 @@ ${JSON.stringify(COMPANY_PROFILE.techStack)}
 Translate all product names, descriptions, reasonings, and tech stacks into Chinese.
 `;
 
-export const scoutAmazonProducts = async (): Promise<AgentReport> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Modified signature to accept apiKey directly
+export const scoutAmazonProducts = async (apiKey: string): Promise<AgentReport> => {
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please provide a valid Google Gemini API Key.");
+  }
+
+  // Initialize strictly with the passed key
+  const ai = new GoogleGenAI({ apiKey });
   
   // 1. Load History from LocalStorage
   let history: string[] = [];
@@ -216,6 +222,7 @@ export const scoutAmazonProducts = async (): Promise<AgentReport> => {
 
   } catch (error) {
     console.error("Gemini Scout Error:", error);
-    throw new Error("Failed to scout products. Please ensure your API Key is valid and allows Search Grounding.");
+    // Rethrow with a user-friendly message if possible, or pass the raw error
+    throw error;
   }
 };
