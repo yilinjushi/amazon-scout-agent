@@ -1,3 +1,4 @@
+
 name: Weekly Product Scout
 
 on:
@@ -34,6 +35,7 @@ jobs:
           EMAIL_SERVICE_ID: ${{ secrets.EMAIL_SERVICE_ID }}
           EMAIL_TEMPLATE_ID: ${{ secrets.EMAIL_TEMPLATE_ID }}
           EMAIL_PUBLIC_KEY: ${{ secrets.EMAIL_PUBLIC_KEY }}
+          EMAIL_PRIVATE_KEY: ${{ secrets.EMAIL_PRIVATE_KEY }} # 新增私钥
         run: node server/weekly_task.mjs
 
       - name: Commit and Push History
@@ -44,3 +46,4 @@ jobs:
           git add server/history.json
           # 检查是否有变更，如果有则提交
           git diff --quiet && git diff --staged --quiet || (git commit -m "update: scout history [skip ci]" && git push)
+
