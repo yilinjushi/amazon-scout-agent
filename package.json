@@ -10,7 +10,8 @@
     "scout": "node server/weekly_task.mjs"
   },
   "dependencies": {
-    "@google/genai": "^0.1.1",
+    "@google/genai": "^1.38.0",
+    "dotenv": "^17.2.3",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
