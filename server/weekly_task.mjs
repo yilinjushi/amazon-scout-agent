@@ -5,7 +5,7 @@
  * 运行方式:
  * 1. 确保安装了 Node.js (v18+)
  * 2. 安装依赖: npm install @google/genai dotenv
- * 3. 设置环境变量: API_KEY, EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, EMAIL_PUBLIC_KEY
+ * 3. 设置环境变量: API_KEY, EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, EMAIL_PUBLIC_KEY, EMAIL_PRIVATE_KEY
  * 4. 运行: node server/weekly_task.mjs
  */
 
@@ -20,6 +20,8 @@ const CONFIG = {
   emailServiceId: process.env.EMAIL_SERVICE_ID,
   emailTemplateId: process.env.EMAIL_TEMPLATE_ID,
   emailPublicKey: process.env.EMAIL_PUBLIC_KEY,
+  // 新增：EmailJS 私钥 (在 REST API 中对应 accessToken)
+  emailPrivateKey: process.env.EMAIL_PRIVATE_KEY,
   
   recipientEmail: 'icyfire.info@gmail.com',
   historyFile: './server/history.json'
@@ -75,6 +77,8 @@ function validateConfig() {
   if (!CONFIG.emailServiceId) missing.push('EMAIL_SERVICE_ID');
   if (!CONFIG.emailTemplateId) missing.push('EMAIL_TEMPLATE_ID');
   if (!CONFIG.emailPublicKey) missing.push('EMAIL_PUBLIC_KEY');
+  // 检查私钥
+  if (!CONFIG.emailPrivateKey) missing.push('EMAIL_PRIVATE_KEY');
 
   if (missing.length > 0) {
     throw new Error(`配置缺失，请在环境变量中设置: ${missing.join(', ')}`);
@@ -244,6 +248,7 @@ async function sendEmail(report) {
     service_id: CONFIG.emailServiceId,
     template_id: CONFIG.emailTemplateId,
     user_id: CONFIG.emailPublicKey,
+    accessToken: CONFIG.emailPrivateKey, // EmailJS REST API 使用 accessToken 传递 Private Key
     template_params: {
       to_email: CONFIG.recipientEmail,
       subject: `[自动周报] 亚马逊产品侦察 - ${report.date}`,
@@ -287,3 +292,4 @@ async function main() {
 }
 
 main();
+
