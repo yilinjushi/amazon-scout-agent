@@ -85,6 +85,20 @@ function validateConfig() {
   }
 }
 
+// 辅助函数：确保链接是安全的
+// 策略：如果 URL 看起来像具体的 ASIN 链接（容易 404），强制转换为搜索链接
+function ensureSafeUrl(product) {
+    const url = product.url || '';
+    const name = product.name || '';
+    
+    // 如果 URL 为空，或者包含 /dp/ (具体产品页) 或 /gp/，则视为高风险幻觉链接
+    // 此时强制生成搜索链接
+    if (!url || url.includes('/dp/') || url.includes('/gp/') || !url.startsWith('http')) {
+        return `https://www.amazon.com/s?k=${encodeURIComponent(name)}`;
+    }
+    return url;
+}
+
 // --- 1. Gemini AI 扫描逻辑 ---
 async function scoutProducts() {
   console.log("正在启动 Gemini 扫描...");
@@ -115,14 +129,14 @@ async function scoutProducts() {
       "summary": "本周趋势分析摘要（中文）",
       "products": [
         {
-          "name": "产品名称",
+          "name": "产品名称 (English Name + 中文名)",
           "price": "$XX.XX",
           "amazonRating": "4.5",
           "description": "功能简介",
           "matchScore": 85,
           "reasoning": "推荐理由...",
           "requiredTech": ["技术1", "技术2"],
-          "url": "https://...",
+          "url": "Provide an Amazon Search URL (e.g., https://www.amazon.com/s?k=Keywords). DO NOT guess specific /dp/ ASIN links.",
           "imageUrl": "Product Image URL (Try to find a representative image URL, else leave empty)"
         }
       ]
@@ -145,8 +159,9 @@ async function scoutProducts() {
     
     let rawProducts = data.products || [];
 
-    // --- CODE-LEVEL DEDUPLICATION ---
-    // 强制过滤，防止 AI 幻觉导致重复
+    // --- CODE-LEVEL DEDUPLICATION & SANITIZATION ---
+    // 1. 过滤重复
+    // 2. 修复 URL (强制使用搜索链接以避免 404)
     const normalizedHistory = new Set(history.map(h => h.trim().toLowerCase()));
     
     const uniqueProducts = rawProducts.filter(p => {
@@ -154,7 +169,10 @@ async function scoutProducts() {
         const isDuplicate = normalizedHistory.has(normalizedName);
         if (isDuplicate) console.log(`[Filter] Detected duplicate: ${p.name}`);
         return !isDuplicate;
-    });
+    }).map(p => ({
+        ...p,
+        url: ensureSafeUrl(p) // <--- 核心修复：强制修复链接
+    }));
 
     // 截取前 6 个
     const finalProducts = uniqueProducts.slice(0, 6);
