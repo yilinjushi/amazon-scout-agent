@@ -9,7 +9,8 @@ import { AgentReport, AppConfig } from './types';
 
 // Default empty config. 
 // SECURITY: Do NOT hardcode keys here anymore. 
-// Users must enter them in the UI, and they will be saved to LocalStorage.
+// Users must enter them in the UI, and they will be saved to SessionStorage.
+// SessionStorage automatically clears when browser is closed, providing better security.
 const EMPTY_CONFIG: AppConfig = {
   geminiKey: '',
   emailServiceId: '',
@@ -25,9 +26,10 @@ function App() {
   const [showEmail, setShowEmail] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
 
-  // Load config from LocalStorage on startup
+  // Load config from SessionStorage on startup
+  // SessionStorage clears when browser closes, reducing long-term exposure risk
   useEffect(() => {
-    const savedConfig = localStorage.getItem('agent_config');
+    const savedConfig = sessionStorage.getItem('agent_config');
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
@@ -44,7 +46,7 @@ function App() {
 
   const handleSaveConfig = (newConfig: AppConfig) => {
     setConfig(newConfig);
-    localStorage.setItem('agent_config', JSON.stringify(newConfig));
+    sessionStorage.setItem('agent_config', JSON.stringify(newConfig));
     setShowConfigModal(false);
   };
 
@@ -91,7 +93,7 @@ function App() {
     }
   };
 
-  // Don't render until we've checked local storage
+  // Don't render until we've checked session storage
   if (!isConfigLoaded) return null;
 
   // Check if we have a valid configuration (has Gemini Key)
